@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>手札確率計算機</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:      #0f0a0a;
+    --surface: #1a0f0f;
+    --surface2:#231414;
+    --border:  #3d1f1f;
+    --text:    #f0e8e8;
+    --muted:   #8a6a6a;
+    --c0:      #e8002a;
+    --c1:      #ff3355;
+    --c2:      #b80022;
+    --cp:      #ff6600;
+    --miss:    #5a4040;
+    --success: #e8002a;
+    --fail:    #5a4040;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+    padding: 32px 16px 80px;
+    background-image:
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 28px,
+        rgba(232,0,42,0.04) 28px,
+        rgba(232,0,42,0.04) 30px
+      ),
+      repeating-linear-gradient(
+        -45deg,
+        transparent,
+        transparent 28px,
+        rgba(232,0,42,0.04) 28px,
+        rgba(232,0,42,0.04) 30px
+      ),
+      radial-gradient(ellipse at 50% 0%, rgba(232,0,42,0.12) 0%, transparent 60%);
+  }
+
+  header { max-width: 680px; margin: 0 auto 28px; }
+  .header-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    color: var(--c0);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+    opacity: 0.7;
+  }
+  h1 { font-size: clamp(1.5rem, 4vw, 2rem); font-weight: 900; letter-spacing: -0.02em; }
+  h1 span { color: var(--c0); text-shadow: 0 0 20px rgba(232,0,42,0.5); }
+  .header-sub { font-size: 0.8rem; color: var(--muted); margin-top: 6px; line-height: 1.7; }
+
+  .wrap { max-width: 680px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 22px;
+  }
+  .card-title {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 14px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .deck-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .field label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 6px; }
+  .field input[type=number] {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1.1rem;
+    padding: 9px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    -moz-appearance: textfield;
+  }
+  .field input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .field input[type=number]:focus { border-color: var(--c0); }
+
+  .cost-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .cost-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .cost-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .cost-badge.c0 { background: #e8002a22; color: var(--c0); border: 1px solid #e8002a55; }
+  .cost-badge.c1 { background: #ff335522; color: var(--c1); border: 1px solid #ff335555; }
+  .cost-badge.c2 { background: #b8002222; color: var(--c2); border: 1px solid #b8002255; }
+  .cost-badge.cp { background: #ff660022; color: var(--cp); border: 1px solid #ff660055; }
+
+  .cost-info { flex: 1; min-width: 0; }
+  .cost-name { font-size: 0.7rem; color: var(--muted); margin-bottom: 5px; }
+  .cost-input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 1rem;
+    padding: 5px 8px;
+    outline: none;
+    text-align: center;
+    transition: border-color 0.15s;
+    -moz-appearance: textfield;
+  }
+  .cost-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  .cost-input:focus { border-color: var(--c0); }
+
+  .miss-row {
+    margin-top: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .miss-left { display: flex; align-items: center; gap: 10px; }
+  .miss-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    background: #5a404022;
+    color: var(--miss);
+    border: 1px solid #5a404055;
+  }
+  .miss-label { font-size: 0.72rem; color: var(--muted); }
+  .miss-count { font-family: 'JetBrains Mono', monospace; font-size: 0.95rem; color: var(--miss); }
+  .miss-count.warn { color: var(--fail); }
+
+  .rule-box {
+    background: var(--surface2);
+    border-radius: 6px;
+    padding: 12px 14px;
+    font-size: 0.78rem;
+    color: var(--muted);
+    line-height: 1.9;
+  }
+  .rule-box b { color: var(--text); font-weight: 700; }
+
+  .error-msg {
+    background: #f7816622;
+    border: 1px solid #f7816666;
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 0.82rem;
+    color: var(--fail);
+    display: none;
+  }
+
+  .btn-calc {
+    width: 100%;
+    padding: 14px;
+    background: var(--c0);
+    border: none;
+    border-radius: 8px;
+    color: #ffffff;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: opacity 0.15s, transform 0.1s;
+    box-shadow: 0 0 20px rgba(232,0,42,0.35);
+  }
+  .btn-calc:hover { opacity: 0.85; }
+  .btn-calc:active { transform: scale(0.98); }
+  .btn-calc:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  #results { display: none; flex-direction: column; gap: 14px; animation: fadeUp 0.3s ease; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:translateY(0); } }
+
+  .result-hero { text-align: center; padding: 20px 0 12px; }
+  .result-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: clamp(3rem, 10vw, 5rem);
+    font-weight: 700;
+    line-height: 1;
+  }
+  .result-pct.good { color: var(--success); }
+  .result-pct.bad  { color: var(--fail); }
+  .result-pct.mid  { color: #e3b341; }
+  .result-sublabel { font-size: 0.78rem; color: var(--muted); margin-top: 8px; }
+
+  .progress-wrap {
+    background: var(--surface2);
+    border-radius: 100px;
+    height: 6px;
+    margin: 16px 0 4px;
+    overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%;
+    border-radius: 100px;
+    background: var(--success);
+    transition: width 0.7s cubic-bezier(.22,1,.36,1);
+    width: 0%;
+  }
+
+  .rule-toggle {
+    width: 100%;
+    background: none;
+    border: none;
+    padding: 16px 22px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    color: var(--muted);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    transition: color 0.15s;
+    border-radius: 10px;
+  }
+  .rule-toggle:hover { color: var(--text); }
+  .rule-toggle-icon { font-size: 0.6rem; transition: transform 0.2s; }
+  .rule-toggle.open .rule-toggle-icon { transform: rotate(90deg); }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 12px 0; }
+
+  .breakdown-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .breakdown-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .bi-label { font-size: 0.7rem; color: var(--muted); margin-bottom: 6px; }
+  .bi-val { font-family: 'JetBrains Mono', monospace; font-size: 1.4rem; font-weight: 700; }
+  .bi-sub { font-size: 0.68rem; color: var(--muted); margin-top: 3px; }
+
+  @media (max-width: 480px) {
+    .cost-grid { grid-template-columns: 1fr; }
+    .breakdown-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-tag">// opening hand simulator</div>
+  <h1>UA<span>マリガン</span>チェッカー</h1>
+</header>
+
+<div class="wrap">
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="card">
+    <div class="card-title">// card counts</div>
+    <div class="cost-grid">
+      <div class="cost-item">
+        <div><div class="cost-badge c0">COST 0</div></div>
+        <div class="cost-info">
+          <div class="cost-name">無条件でプレイ可</div>
+          <input class="cost-input" type="number" id="cnt0" value="12" min="0">
+        </div>
+      </div>
+      <div class="cost-item">
+        <div><div class="cost-badge c1">COST 1</div></div>
+        <div class="cost-info">
+          <div class="cost-name">場1枚以上でプレイ可</div>
+          <input class="cost-input" type="number" id="cnt1" value="4" min="0">
+        </div>
+      </div>
+      <div class="cost-item">
+        <div><div class="cost-badge c2">COST 2</div></div>
+        <div class="cost-info">
+          <div class="cost-name">場2枚以上でプレイ可</div>
+          <input class="cost-input" type="number" id="cnt2" value="4" min="0">
+        </div>
+      </div>
+      <div class="cost-item">
+        <div><div class="cost-badge cp">擬似 0</div></div>
+        <div class="cost-info">
+          <div class="cost-name">1枚目のみCOST 0扱い</div>
+          <input class="cost-input" type="number" id="cntP" value="0" min="0">
+        </div>
+      </div>
+    </div>
+    <div class="miss-count" id="missCount" style="display:none">30枚</div>
+  </div>
+
+  <div class="card" style="padding: 0;">
+    <button class="rule-toggle" onclick="toggleDeck()" id="deckToggleBtn">
+      <span class="rule-toggle-label">// deck config</span>
+      <span class="rule-toggle-icon" id="deckIcon">▶</span>
+    </button>
+    <div class="rule-body" id="deckBody" style="display:none; padding: 0 22px 18px;">
+      <div class="deck-row">
+        <div class="field">
+          <label>デッキ総枚数</label>
+          <input type="number" id="deckTotal" value="50" min="1" max="200">
+        </div>
+        <div class="field">
+          <label>手札枚数</label>
+          <input type="number" id="handSize" value="7" min="1" max="20">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" style="padding: 0;">
+    <button class="rule-toggle" onclick="toggleRule()" id="ruleToggleBtn">
+      <span class="rule-toggle-label">// rule summary</span>
+      <span class="rule-toggle-icon" id="ruleIcon">▶</span>
+    </button>
+    <div class="rule-body" id="ruleBody" style="display:none; padding: 0 22px 18px;">
+      <div class="rule-box">
+        最初の手札で2or3枚以上プレイできる確率を計算します。<br>
+        引き直し1回（同枚数・最初の手札を除外）を含みます。<br>
+        <br>
+        <b>プレイ条件</b><br>
+        COST 0 → 無条件でプレイ可<br>
+        COST 1 → 場に1枚以上あればプレイ可<br>
+        COST 2 → 場に2枚以上あればプレイ可<br>
+        擬似0　→ 手札内1枚目のみCOST 0扱い、2枚目以降はCOST 2扱い<br>
+        <br>
+        <b>引き直し</b><br>
+        条件枚数未満 → 最初の手札を除いた残りデッキから同枚数引き直し（1回のみ）
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-calc" id="btnCalc" onclick="calculate()">確率を計算する</button>
+
+  <div id="results">
+    <!-- マリガン条件：3枚 -->
+    <div class="card">
+      <div class="card-title">// result &nbsp;<span style="color:var(--c0);font-size:0.75em;">マリガン条件：3枚プレイ</span></div>
+      <div class="result-hero">
+        <div class="result-pct" id="totalPct3">—</div>
+        <div class="result-sublabel">3枚以上プレイ成功確率（引き直し込み）</div>
+        <div class="progress-wrap">
+          <div class="progress-bar" id="progressBar3"></div>
+        </div>
+      </div>
+      <hr>
+      <div class="breakdown-grid">
+        <div class="breakdown-item">
+          <div class="bi-label">初手成功率</div>
+          <div class="bi-val" id="r1Pct3" style="color:var(--c0)">—</div>
+          <div class="bi-sub">引き直しなしで3枚以上成功</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="bi-label">2枚以上プレイ成功率</div>
+          <div class="bi-val" id="r2Pct3" style="color:var(--cp)">—</div>
+          <div class="bi-sub">初手 or 引き直し後に2枚以上</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="bi-label">最終失敗率</div>
+          <div class="bi-val" id="rfPct3" style="color:var(--fail)">—</div>
+          <div class="bi-sub">両方失敗</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- マリガン条件：2枚 -->
+    <div class="card">
+      <div class="card-title">// result &nbsp;<span style="color:var(--c2);font-size:0.75em;">マリガン条件：2枚プレイ</span></div>
+      <div class="result-hero">
+        <div class="result-pct" id="totalPct2">—</div>
+        <div class="result-sublabel">2枚以上プレイ成功確率（引き直し込み）</div>
+        <div class="progress-wrap">
+          <div class="progress-bar" id="progressBar2"></div>
+        </div>
+      </div>
+      <hr>
+      <div class="breakdown-grid">
+        <div class="breakdown-item">
+          <div class="bi-label">初手成功率</div>
+          <div class="bi-val" id="r1Pct2" style="color:var(--c0)">—</div>
+          <div class="bi-sub">引き直しなしで2枚以上成功</div>
+        </div>
+        <div class="breakdown-item">
+          <div class="bi-label">最終失敗率</div>
+          <div class="bi-val" id="rfPct2" style="color:var(--fail)">—</div>
+          <div class="bi-sub">両方失敗</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── 組み合わせ計算（対数で桁あふれ防止）──
+function logFactorial(n) {
+  let r = 0;
+  for (let i = 2; i <= n; i++) r += Math.log(i);
+  return r;
+}
+function logComb(n, k) {
+  if (k < 0 || k > n) return -Infinity;
+  return logFactorial(n) - logFactorial(k) - logFactorial(n - k);
+}
+function comb(n, k) {
+  if (k < 0 || k > n) return 0;
+  return Math.exp(logComb(n, k));
+}
+
+// ── プレイ可能枚数の判定（枚数パターンから直接計算）──
+// hand = {c0, c1, c2, cp, miss}
+// 擬似0(cp): 1枚目→cost0扱い、2枚目以降→cost2扱い
+function countPlayableFromCounts(c0, c1, c2, cp, miss) {
+  // 擬似0を変換: 1枚目=0扱い、残り=2扱い
+  const eff0 = c0 + (cp >= 1 ? 1 : 0);
+  const eff2 = c2 + Math.max(0, cp - 1);
+
+  let field = 0, played = 0;
+
+  // cost0系を全部出す
+  field  += eff0;
+  played += eff0;
+
+  // cost1, cost2 を条件が満たされる限り繰り返す
+  let rem1 = c1, rem2 = eff2;
+  let progress = true;
+  while (progress) {
+    progress = false;
+    if (rem1 > 0 && field >= 1) {
+      field += rem1; played += rem1; rem1 = 0; progress = true;
+    }
+    if (rem2 > 0 && field >= 2) {
+      field += rem2; played += rem2; rem2 = 0; progress = true;
+    }
+  }
+  return played;
+}
+
+// ── 手札パターンの全列挙と確率計算 ──
+// deck構成: total枚中 N0,N1,N2,Np,Nmiss枚
+// hand: h枚引いたときの各パターン確率 = 多変量超幾何分布
+function calcHandProbs(total, handSize, N0, N1, N2, Np, Nmiss) {
+  const results = []; // { c0,c1,c2,cp,miss, prob, playable }
+  const logDenom = logComb(total, handSize);
+
+  for (let c0 = 0; c0 <= Math.min(N0, handSize); c0++) {
+    for (let c1 = 0; c1 <= Math.min(N1, handSize - c0); c1++) {
+      for (let c2 = 0; c2 <= Math.min(N2, handSize - c0 - c1); c2++) {
+        for (let cp = 0; cp <= Math.min(Np, handSize - c0 - c1 - c2); cp++) {
+          const miss = handSize - c0 - c1 - c2 - cp;
+          if (miss < 0 || miss > Nmiss) continue;
+
+          const logNum = logComb(N0,c0) + logComb(N1,c1) + logComb(N2,c2)
+                       + logComb(Np,cp) + logComb(Nmiss,miss);
+          const prob = Math.exp(logNum - logDenom);
+          if (prob <= 0) continue;
+
+          const playable = countPlayableFromCounts(c0, c1, c2, cp, miss);
+          results.push({ c0, c1, c2, cp, miss, prob, playable });
+        }
+      }
+    }
+  }
+  return results;
+}
+
+// ── メイン計算（純粋確率計算）──
+function calculate() {
+  const total    = parseInt(document.getElementById('deckTotal').value);
+  const handSize = parseInt(document.getElementById('handSize').value);
+  const N0 = parseInt(document.getElementById('cnt0').value) || 0;
+  const N1 = parseInt(document.getElementById('cnt1').value) || 0;
+  const N2 = parseInt(document.getElementById('cnt2').value) || 0;
+  const Np = parseInt(document.getElementById('cntP').value) || 0;
+  const Nmiss = total - N0 - N1 - N2 - Np;
+
+  const errEl = document.getElementById('errorMsg');
+  errEl.style.display = 'none';
+
+  if (!total || total < 1)       return showError('デッキ総枚数を正しく入力してください');
+  if (!handSize || handSize < 1) return showError('手札枚数を正しく入力してください');
+  if (handSize > total)          return showError('手札枚数がデッキ総枚数を超えています');
+  if (Nmiss < 0)                 return showError('各種カードの合計がデッキ総枚数を超えています');
+
+  const btn = document.getElementById('btnCalc');
+  btn.disabled = true;
+  btn.textContent = '計算中...';
+
+  setTimeout(() => {
+    // 初手パターン一覧
+    const hand1Patterns = calcHandProbs(total, handSize, N0, N1, N2, Np, Nmiss);
+
+    // 各マリガン条件の確率を積算
+    let p3first = 0, p3redraw3 = 0, p3redraw2 = 0;
+    let p2first = 0, p2redraw2 = 0;
+
+    const remainTotal = total - handSize;
+
+    for (const h1 of hand1Patterns) {
+      const play1 = h1.playable;
+
+      // ── マリガン条件3枚 ──
+      if (play1 >= 3) {
+        p3first += h1.prob;
+      } else {
+        // 残りデッキの構成
+        const R0    = N0 - h1.c0;
+        const R1    = N1 - h1.c1;
+        const R2    = N2 - h1.c2;
+        const Rp    = Np - h1.cp;
+        const Rmiss = Nmiss - h1.miss;
+
+        const hand2Patterns = calcHandProbs(remainTotal, handSize, R0, R1, R2, Rp, Rmiss);
+        for (const h2 of hand2Patterns) {
+          const p = h1.prob * h2.prob;
+          if (h2.playable >= 3) p3redraw3 += p;
+          if (h2.playable >= 2) p3redraw2 += p;
+        }
+      }
+
+      // ── マリガン条件2枚 ──
+      if (play1 >= 2) {
+        p2first += h1.prob;
+      } else {
+        const R0    = N0 - h1.c0;
+        const R1    = N1 - h1.c1;
+        const R2    = N2 - h1.c2;
+        const Rp    = Np - h1.cp;
+        const Rmiss = Nmiss - h1.miss;
+
+        const hand2Patterns = calcHandProbs(remainTotal, handSize, R0, R1, R2, Rp, Rmiss);
+        for (const h2 of hand2Patterns) {
+          if (h2.playable >= 2) p2redraw2 += h1.prob * h2.prob;
+        }
+      }
+    }
+
+    const p3total = p3first + p3redraw3;
+    const p3two   = p3first + p3redraw2; // 初手3枚成功 + 引き直し後2枚以上
+    const p3fail  = 1 - p3total;
+
+    const p2total = p2first + p2redraw2;
+    const p2fail  = 1 - p2total;
+
+    showResults(p3total, p3first, p3two, p3fail, p2total, p2first, p2fail);
+    btn.disabled = false;
+    btn.textContent = '確率を計算する';
+  }, 30);
+}
+
+function updateMissCount() {
+  const total = parseInt(document.getElementById('deckTotal').value) || 0;
+  const c0 = parseInt(document.getElementById('cnt0').value) || 0;
+  const c1 = parseInt(document.getElementById('cnt1').value) || 0;
+  const c2 = parseInt(document.getElementById('cnt2').value) || 0;
+  const cp = parseInt(document.getElementById('cntP').value) || 0;
+  const el = document.getElementById('missCount');
+  if (el) el.textContent = (total - c0 - c1 - c2 - cp) + '枚';
+}
+document.querySelectorAll('input[type=number]').forEach(el => el.addEventListener('input', updateMissCount));
+updateMissCount();
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg;
+  el.style.display = 'block';
+  const btn = document.getElementById('btnCalc');
+  btn.disabled = false;
+  btn.textContent = '確率を計算する';
+  return false;
+}
+
+function pctStr(p) { return (p * 100).toFixed(2) + '%'; }
+
+function showResults(p3total, p3first, p3two, p3fail, p2total, p2first, p2fail) {
+  const resultsEl = document.getElementById('results');
+  resultsEl.style.display = 'flex';
+
+  const pct3El = document.getElementById('totalPct3');
+  pct3El.textContent = pctStr(p3total);
+  pct3El.className = 'result-pct ' + (p3total >= 0.8 ? 'good' : p3total >= 0.5 ? 'mid' : 'bad');
+  document.getElementById('r1Pct3').textContent = pctStr(p3first);
+  document.getElementById('r2Pct3').textContent = pctStr(p3two);
+  document.getElementById('rfPct3').textContent = pctStr(p3fail);
+
+  const pct2El = document.getElementById('totalPct2');
+  pct2El.textContent = pctStr(p2total);
+  pct2El.className = 'result-pct ' + (p2total >= 0.8 ? 'good' : p2total >= 0.5 ? 'mid' : 'bad');
+  document.getElementById('r1Pct2').textContent = pctStr(p2first);
+  document.getElementById('rfPct2').textContent = pctStr(p2fail);
+
+  setTimeout(() => {
+    const bar3 = document.getElementById('progressBar3');
+    bar3.style.width = (p3total * 100) + '%';
+    bar3.style.background = p3total >= 0.8 ? 'var(--success)' : p3total >= 0.5 ? '#e3b341' : 'var(--fail)';
+    const bar2 = document.getElementById('progressBar2');
+    bar2.style.width = (p2total * 100) + '%';
+    bar2.style.background = p2total >= 0.8 ? 'var(--success)' : p2total >= 0.5 ? '#e3b341' : 'var(--fail)';
+  }, 50);
+
+  resultsEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function toggleRule() {
+  const body = document.getElementById('ruleBody');
+  const btn  = document.getElementById('ruleToggleBtn');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  btn.classList.toggle('open', open);
+}
+
+function toggleDeck() {
+  const body = document.getElementById('deckBody');
+  const btn  = document.getElementById('deckToggleBtn');
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  btn.classList.toggle('open', open);
+}
+</script>
+</body>
+</html>
